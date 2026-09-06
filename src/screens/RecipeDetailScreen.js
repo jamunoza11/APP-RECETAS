@@ -1,6 +1,7 @@
 // src/screens/RecipeDetailScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getDatabase } from '../database/db';
 
 export default function RecipeDetailScreen({ route, navigation }) {
@@ -17,9 +18,11 @@ export default function RecipeDetailScreen({ route, navigation }) {
     }
   };
 
-  useEffect(() => {
-    loadRecipeDetails();
-  }, [recipeId]);
+  useFocusEffect(
+    useCallback(() => {
+      loadRecipeDetails();
+    }, [recipeId])
+  );
 
   const toggleFavorite = async () => {
     try {
@@ -81,6 +84,14 @@ export default function RecipeDetailScreen({ route, navigation }) {
       <Text style={styles.sectionTitle}>Instrucciones:</Text>
       <Text style={styles.textContent}>{recipe.instructions}</Text>
 
+      {/* Botón para Editar Receta */}
+      <TouchableOpacity 
+        style={styles.editButton} 
+        onPress={() => navigation.navigate('RecipeForm', { recipeId: recipe.id })}
+      >
+        <Text style={styles.editButtonText}>✏️ Editar Receta</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
         <Text style={styles.deleteButtonText}>Eliminar Receta</Text>
       </TouchableOpacity>
@@ -95,8 +106,10 @@ const styles = StyleSheet.create({
   favButton: { padding: 8 },
   favIcon: { fontSize: 28 },
   time: { fontSize: 14, color: '#666', marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#ff6347', marginTop: 16, marginBottom: 6 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#9370db', marginTop: 16, marginBottom: 6 },
   textContent: { fontSize: 16, color: '#444', lineHeight: 22, backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8 },
-  deleteButton: { backgroundColor: '#ff4d4d', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 30 },
+  editButton: { backgroundColor: '#9370db', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 24 },
+  editButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  deleteButton: { backgroundColor: '#ff4d4d', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 12, marginBottom: 20 },
   deleteButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

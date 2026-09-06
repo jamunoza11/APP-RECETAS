@@ -1,88 +1,123 @@
-// src/screens/RecipeFormScreen.js
-import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+// src/screens/RecipeForm.js
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { getDatabase } from '../database/db';
 import { AuthContext } from '../context/AuthContext';
 
-export default function RecipeFormScreen({ navigation }) {
-  const { userToken } = useContext(AuthContext);
+export default function RecipeForm({ route, navigation }) {
+  const recipeId = route.params?.recipeId; // Si viene, estamos editando
   const [name, setName] = useState('');
   const [ingredients, setIngredients] = useState('');
   const [instructions, setInstructions] = useState('');
   const [prepTime, setPrepTime] = useState('');
+  const { userToken } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (recipeId) {
+      loadRecipeData();
+    }
+  }, [recipeId]);
+
+  const loadRecipeData = async () => {
+    try {
+      const db = await getDatabase();
+      const recipe = await db.getFirstAsync('SELECT * FROM recipes WHERE id = ?;', [recipeId]);
+      if (recipe) {
+        setName(recipe.name);
+        setIngredients(recipe.ingredients || '');
+        setInstructions(recipe.instructions || '');
+        setPrepTime(recipe.prep_time_minutes ? recipe.prep_time_minutes.toString() : '');
+      }
+    } catch (error) {
+      console.error('Error al cargar receta para editar:', error);
+    }
+  };
 
   const handleSave = async () => {
-    if (!name || !ingredients || !instructions) {
-      Alert.alert('Error', 'Por favor llena los campos obligatorios');
+    if (!name.trim() || !instructions.trim()) {
+      Alert.alert('Error', 'El nombre y las instrucciones son obligatorios.');
       return;
     }
 
     try {
       const db = await getDatabase();
-      
-      // Inserción incluyendo el user_id y la columna prep_time_minutes correcta
-      await db.runAsync(
-        'INSERT INTO recipes (user_id, name, ingredients, instructions, prep_time_minutes) VALUES (?, ?, ?, ?, ?);',
-        [userToken, name, ingredients, instructions, prepTime ? parseInt(prepTime) : 0]
-      );
+      const timeVal = parseInt(prepTime) || 15;
 
-      Alert.alert('Éxito', 'Receta guardada correctamente');
+      if (recipeId) {
+        // Actualizar receta existente
+        await db.runAsync(
+          'UPDATE recipes SET name = ?, ingredients = ?, instructions = ?, prep_time_minutes = ? WHERE id = ?;',
+          [name, ingredients, instructions, timeVal, recipeId]
+        );
+        Alert.alert('Éxito', 'Receta actualizada correctamente');
+      } else {
+        // Crear receta nueva
+        await db.runAsync(
+          'INSERT INTO recipes (user_id, name, ingredients, instructions, prep_time_minutes, is_favorite) VALUES (?, ?, ?, ?, ?, 0);',
+          [userToken, name, ingredients, instructions, timeVal]
+        );
+        Alert.alert('Éxito', 'Receta creada correctamente');
+      }
+
       navigation.goBack();
     } catch (error) {
-      console.error('Error al guardar la receta en SQLite:', error);
-      Alert.alert('Error', 'No se pudo guardar la receta en la base de datos.');
+      console.error('Error al guardar la receta:', error);
+      Alert.alert('Error', 'No se pudo guardar la receta.');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>Nombre de la Receta</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.label}>{recipeId ? 'Editar Receta' : 'Nueva Receta'}</Text>
+      
       <TextInput
         style={styles.input}
-        placeholder="Ej. Tacos al pastor"
+        placeholder="Nombre de la receta"
+        placeholderTextColor="#999"
         value={name}
         onChangeText={setName}
       />
 
-      <Text style={styles.label}>Ingredientes</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Lista los ingredientes..."
-        multiline
-        value={ingredients}
-        onChangeText={setIngredients}
-      />
-
-      <Text style={styles.label}>Instrucciones</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Pasos de preparación..."
-        multiline
-        value={instructions}
-        onChangeText={setInstructions}
-      />
-
-      <Text style={styles.label}>Tiempo de Preparación (minutos)</Text>
       <TextInput
         style={styles.input}
-        placeholder="Ej. 30"
+        placeholder="Tiempo de preparación (minutos)"
+        placeholderTextColor="#999"
         keyboardType="numeric"
         value={prepTime}
         onChangeText={setPrepTime}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Guardar Receta</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        placeholder="Ingredientes"
+        placeholderTextColor="#999"
+        multiline
+        value={ingredients}
+        onChangeText={setIngredients}
+      />
+
+      <TextInput
+        style={[styles.input, styles.textAreaLarge]}
+        placeholder="Instrucciones de preparación"
+        placeholderTextColor="#999"
+        multiline
+        value={instructions}
+        onChangeText={setInstructions}
+      />
+
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <Text style={styles.saveButtonText}>{recipeId ? 'GUARDAR CAMBIOS' : 'CREAR RECETA'}</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#333', marginBottom: 6, marginTop: 12 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, backgroundColor: '#f9f9f9', fontSize: 16 },
+  container: { padding: 20, backgroundColor: '#f8f9fa', flexGrow: 1 },
+  label: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 20, textAlign: 'center' },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 16, color: '#333' },
   textArea: { height: 90, textAlignVertical: 'top' },
-  button: { backgroundColor: '#ff6347', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 24 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  textAreaLarge: { height: 140, textAlignVertical: 'top' },
+  saveButton: { backgroundColor: '#9370db', height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#9370db', shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });
